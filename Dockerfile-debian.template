@@ -1,6 +1,12 @@
 {{ include "version-id" -}}
 FROM {{ env.from }}
 
+# Fix Debian Buster EOL - use archive repositories
+RUN sed -i 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g' /etc/apt/sources.list \
+	&& sed -i 's|http://security.debian.org/debian-security|http://archive.debian.org/debian-security|g' /etc/apt/sources.list \
+	&& sed -i '/stretch-updates/d' /etc/apt/sources.list \
+	&& echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid-until
+
 # prevent Debian's PHP packages from being installed
 # https://github.com/docker-library/php/pull/542
 RUN set -eux; \
@@ -60,7 +66,7 @@ ENV PHP_LDFLAGS="-Wl,-O1 -pie"
 ENV GPG_KEYS {{ .gpgKeys }}
 
 ENV PHP_VERSION {{ .version }}
-ENV PHP_URL="{{ .url }}" PHP_ASC_URL="{{ .ascUrl // "" }}"
+ENV PHP_URL="{{ .url }}" PHP_ASC_URL=""
 ENV PHP_SHA256="{{ .sha256 // "" }}"
 
 RUN set -eux; \
@@ -236,9 +242,10 @@ COPY docker-php-ext-* docker-php-entrypoint /usr/local/bin/
 RUN docker-php-ext-enable sodium
 
 {{ ) else "" end -}}
-RUN pecl install -o -f redis \
+RUN pecl install -o -f redis apcu\
 &&  rm -rf /tmp/pear \
-&&  docker-php-ext-enable redis
+&&  docker-php-ext-enable redis \
+&&  docker-php-ext-enable apcu
 {{
 	# https://github.com/docker-library/php/issues/865
 	# https://bugs.php.net/bug.php?id=76324
